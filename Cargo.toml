@@ -1,0 +1,15 @@
+[package]
+name = "lilscript"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chrono = "0.4.26"
+clap = { version = "4.0", features = ["derive"] }
+clap-verbosity-flag = "2.0.1"
+env_logger = "0.10.0"
+log = "0.4.19"
+num-format = { version = "0.4.4", features = ["with-system-locale"] }
+regex = "1.9.1"

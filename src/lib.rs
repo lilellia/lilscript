@@ -121,14 +121,7 @@ pub fn run(args: ArgumentParser) -> Result<(), Box<dyn Error>> {
         _ => unreachable!(),
     }?;
 
-    // // Get the exported file format
-    // let script = crate::tex_handler::parse(&fcontents)?;
-
-    // info!("Title: {}", script.title);
-    // info!("Words: {}", script.wordcount());
-
     // Write the desired file
-    // println!("{}", &script.to_string());
     fs::write(args.outfile, &script.to_markdown())?;
 
     Ok(())

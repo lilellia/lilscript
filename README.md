@@ -15,8 +15,7 @@ cargo run -- --infile=/path/to/script.tex --output=/path/to/export.md
 - [x] Parsing .tex file to an internal Script format
 - [ ] Parsing .md file to internal Script format
 - [ ] Exporting internal Script format to .tex file
+- [ ] Add .tex/.md conversion to PDF
 - [x] Exporting internal Script format to .md file
-- [ ] Determining word count for script (spoken words, total words)...
-- [ ] ...and the corresponding speech density
-
-**Note:** The parsing/exporting methods do not yet properly handle the header information for the script.
+- [x] Determining word count for script (spoken words, total words)...
+- [x] ...and the corresponding speech density

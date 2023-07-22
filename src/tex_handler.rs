@@ -1,7 +1,8 @@
 // /// Convert from a string to a Script object.
 // pub use crate::tex_handler::parse::to_script as parse;
 
-use crate::script::{ContainerKind, Script, SeriesEntry, TextContainer, TextSpan};
+use crate::script::{Character, ContainerKind, Script, SeriesEntry, TextContainer, TextSpan};
+use chrono::NaiveDate;
 use log::warn;
 use regex::Regex;
 
@@ -213,8 +214,25 @@ impl TryFrom<&Tex> for Script {
             .map(|c| c.get(1).unwrap().as_str().to_owned())
             .collect();
 
+        let date = search_tex("scriptDate", &value.text).ok_or("Could not find date")?;
+        log::debug!("unprocessed date: \"{}\"", date);
+        let date = NaiveDate::parse_from_str(&date, "%d %b %Y").ok();
+        log::debug!("  processed date: \"{:?}\"", date);
+
         let summary = search_tex("summary", &value.text).ok_or("Could not find summary")?;
 
+        // Handle the character processing
+        let re = Regex::new(r"\\character\{(?P<name>.*?)\}\s*\{(?P<desc>.*?)\}").unwrap();
+        let characters: Vec<Character> = re
+            .captures_iter(&value.text)
+            .map(|capture| {
+                let name = Tex::unescaped(&capture["name"]);
+                let description = Tex::unescaped(&capture["desc"]);
+                Character::new(&name, &description)
+            })
+            .collect();
+
+        // Find the start of the actual script part. It'll be after \clearpage
         let index = match Regex::new(r"\\clearpage").unwrap().find(&value.text) {
             None => 0,
             Some(m) => m.end(),
@@ -234,16 +252,15 @@ impl TryFrom<&Tex> for Script {
             paragraphs.push(container);
         }
 
-        // TODO: Add parsing for date
-        // TODO: Add parsing for characters
         let script = Script {
             author: author.to_owned(),
             title: title.to_owned(),
             series,
             tags,
+            date,
+            characters,
             summary: summary.to_owned(),
             paragraphs,
-            ..Default::default()
         };
 
         Ok(script)

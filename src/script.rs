@@ -1,8 +1,7 @@
-use chrono::NaiveDateTime;
+use chrono::NaiveDate;
 use num_format::{Locale, ToFormattedString};
 use regex::Regex;
 use std::{
-    collections::HashMap,
     fmt::{self, Display},
     ops::Add,
 };
@@ -11,10 +10,10 @@ use std::{
 #[derive(Debug, PartialEq)]
 pub struct WordCount {
     /// The number of spoken words.
-    pub spoken: usize,
+    spoken: usize,
 
     /// The number of unspoken words.
-    pub unspoken: usize,
+    unspoken: usize,
 }
 
 impl fmt::Display for WordCount {
@@ -47,6 +46,22 @@ impl WordCount {
     /// Construct a new WordCount initialised with the given values.
     pub fn new(spoken: usize, unspoken: usize) -> Self {
         Self { spoken, unspoken }
+    }
+
+    /// A convenience method for creating a WordCount with no unspoken words.
+    pub fn only_spoken(words: usize) -> Self {
+        Self {
+            spoken: words,
+            unspoken: 0,
+        }
+    }
+
+    /// A convenience method for creating a WordCount with no spoken words.
+    pub fn only_unspoken(words: usize) -> Self {
+        Self {
+            spoken: 0,
+            unspoken: words,
+        }
     }
 
     /**
@@ -92,7 +107,7 @@ impl Add for WordCount {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SpanKind {
     /// just some normal text
     Normal,
@@ -143,10 +158,65 @@ impl TextSpan {
             contents: self.contents.clone(),
         }
     }
+
+    /// Return the number of words contained in the span.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use lilscript::script::TextSpan;
+    /// let span = TextSpan::normal("This isn't some text, is it?");
+    /// assert_eq!(span.num_words(), 6);
+    /// ```
+    ///
+    /// ```
+    /// # use lilscript::script::TextSpan;
+    /// let span = TextSpan::normal("C'est même en français, avec les accents.");
+    /// assert_eq!(span.num_words(), 7);
+    /// ```
+    ///
+    /// ```
+    /// # use lilscript::script::TextSpan;
+    /// let span = TextSpan::emphasis("hyphenated-words-count-once");
+    /// assert_eq!(span.num_words(), 1);
+    /// ```
+    ///
+    /// ```
+    /// # use lilscript::script::TextSpan;
+    /// // it doesn't work with non-Latin scripts
+    /// let span = TextSpan::normal("ねぇ、大丈夫？");
+    /// assert_eq!(span.num_words(), 0);
+    /// ```
+    pub fn num_words(&self) -> usize {
+        let re = Regex::new(r"[A-Za-zÀ-ÖØ-öø-ÿ'~-]+").unwrap();
+        re.find_iter(&self.contents).count()
+    }
+
+    /// Determine whether this span counts as spoken within the context of the given parent container.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use lilscript::script::{ContainerKind, TextSpan};
+    /// let span = TextSpan::normal("Some text");
+    /// assert!(span.is_spoken(ContainerKind::Spoken));
+    /// assert!(!span.is_spoken(ContainerKind::StageDir));
+    /// ```
+    pub fn is_spoken(&self, context: ContainerKind) -> bool {
+        if context != ContainerKind::Spoken {
+            // anything that isn't in a spoken container counts as nonspoken
+            return false;
+        }
+
+        match self.kind {
+            SpanKind::InlineDirection => false,
+            _ => true,
+        }
+    }
 }
 
 /// A representation of the type of text container.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ContainerKind {
     /// a container for spoken text
     Spoken,
@@ -176,26 +246,38 @@ pub struct TextContainer {
 }
 
 impl TextContainer {
-    /**
-    Create a new, empty text container.
-
-    ```
-    # use lilscript::script::{ContainerKind, TextContainer};
-    let container = TextContainer::new();
-    assert_eq!(container.kind, ContainerKind::PlainText);
-    assert_eq!(container.spans, vec![]);
-    ```
-    */
-    pub fn new() -> Self {
+    /// Create a new, text container of the given type.
+    pub fn new(kind: ContainerKind) -> Self {
         Self {
-            kind: ContainerKind::PlainText,
+            kind,
             spans: vec![],
         }
+    }
+
+    /// add the given span to the end of the list and return the container back
+    pub fn push(mut self, span: TextSpan) -> Self {
+        self.spans.push(span);
+        return self
     }
 
     /// Return the number of spans in the container.
     pub fn len(&self) -> usize {
         self.spans.len()
+    }
+
+    pub fn wordcount(&self) -> WordCount {
+        self.spans
+            .iter()
+            .map(|span| {
+                let words = span.num_words();
+                if span.is_spoken(self.kind.clone()) {
+                    WordCount::only_spoken(words)
+                } else {
+                    WordCount::only_unspoken(words)
+                }
+            })
+            // add these wordcounts together
+            .fold(WordCount::zero(), |acc, w| acc + w)
     }
 }
 
@@ -267,6 +349,31 @@ impl SeriesEntry {
     }
 }
 
+#[derive(Debug)]
+pub struct Character {
+    /// The name/header information regarding the character
+    pub name: String,
+
+    /// The description of the character
+    pub description: String,
+}
+
+impl Display for Character {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} => {}", self.name, self.description)
+    }
+}
+
+impl Character {
+    /// Create a new character with the given fields.
+    pub fn new(name: &str, description: &str) -> Self {
+        Self {
+            name: name.to_owned(),
+            description: description.to_owned(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 /// A representation of a script.
 pub struct Script {
@@ -283,13 +390,13 @@ pub struct Script {
     pub tags: Vec<String>,
 
     /// The date of the script.
-    pub date: Option<NaiveDateTime>,
+    pub date: Option<NaiveDate>,
 
     /// The summary of the script.
     pub summary: String,
 
-    /// Information about the characters - {name => description}
-    pub characters: HashMap<String, String>,
+    /// Information about the characters
+    pub characters: Vec<Character>,
 
     /// The actual text of the script.
     pub paragraphs: Vec<TextContainer>,
@@ -320,27 +427,39 @@ impl Script {
             ..Default::default()
         }
     }
+
+    /// Return the word count for the entire script.
+    pub fn wordcount(&self) -> WordCount {
+        self.paragraphs
+            .iter()
+            .map(|container| container.wordcount())
+            .fold(WordCount::zero(), |acc, w| acc + w)
+    }
 }
 
 impl Display for Script {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut lines: Vec<String> = vec![
-            format!("Title: {}", self.title),
-            format!("Author: {}", self.author),
-            format!("Series: {}", self.series),
-            format!(
-                "Tags: {}",
-                self.tags
-                    .iter()
-                    .map(|t| format!("[{}]", t))
-                    .collect::<Vec<String>>()
-                    .join(" ")
-            ),
-            format!("Date: {}", ""),  // TODO: Implement Date
-            format!("Summary: {}", self.summary),
-            format!("Characters: {}", ""),  // TODO: Implement Characters
-            String::new(),
-        ];
+        writeln!(f, "Title: {}", self.title)?;
+        writeln!(f, "Author: {}", self.author)?;
+        writeln!(f, "Series: {}", self.series)?;
+
+        let tags = self
+            .tags
+            .iter()
+            .map(|tag| format!("[{}]", tag))
+            .collect::<Vec<String>>()
+            .join(" ");
+        writeln!(f, "Tags: {}", tags)?;
+
+        writeln!(f, "Date: {:?}", self.date)?;
+        writeln!(f, "Summary: {}", self.summary)?;
+
+        for character in &self.characters {
+            writeln!(f, "Character: {}", character)?;
+        }
+
+        writeln!(f, "Words: {}", self.wordcount())?;
+        writeln!(f, "")?;
 
         for container in &self.paragraphs {
             for (i, span) in container.spans.iter().enumerate() {
@@ -349,13 +468,12 @@ impl Display for Script {
                 } else {
                     String::from("_")
                 };
-                let line = format!("{}::{:?}", prefix, span);
-                lines.push(line)
+                
+                writeln!(f, "{}::{:?}", prefix, span)?;
             }
         }
 
-        let s = lines.join("\n");
-        write!(f, "{}", s)
+        Ok(())
     }
 }
 

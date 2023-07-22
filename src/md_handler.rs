@@ -184,9 +184,54 @@ impl ToMarkdown for TextContainer {
 
 impl ToMarkdown for Script {
     fn to_markdown(&self) -> String {
-        (&self.paragraphs)
-            .into_iter()
-            .map(|container| format!("{}\n\n", container.to_markdown()))
-            .collect::<String>()
+        const DIVIDER: &str = "--8<--";
+
+        let mut lines: Vec<String> = Vec::new();
+
+        // NOTE: This does not include any script info header information
+
+        // Character info
+        lines.push(String::from("## Characters"));
+        for character in &self.characters {
+            lines.push(format!(
+                "- **{}** ∼ {}",
+                character.name, character.description
+            ))
+        }
+
+        // Formatting guide
+        lines.append(&mut vec![
+            String::from("## Formatting guide"),
+
+            TextContainer::new(ContainerKind::Spoken)
+                .push(TextSpan::normal("spoken text"))
+                .to_markdown(),
+            
+            TextContainer::new(ContainerKind::Spoken)
+                .push(TextSpan::emphasis("emphasis"))
+                .to_markdown(),
+
+            TextContainer::new(ContainerKind::Spoken)
+                .push(TextSpan::inline("tone cue, suggested"))
+                .to_markdown(),
+
+            TextContainer::new(ContainerKind::StageDir)
+                .push(TextSpan::normal("stage direction and/or sfx"))
+                .to_markdown(),
+
+            TextContainer::new(ContainerKind::ListenerDialogue)
+                .push(TextSpan::normal("example listener dialogue, not intended to be voiced"))
+                .to_markdown(),
+
+            TextContainer::new(ContainerKind::PlainText)
+                .push(TextSpan::normal(DIVIDER))
+                .to_markdown()
+        ]);
+
+        for container in &self.paragraphs {
+            lines.push(container.to_markdown());
+        }
+
+        lines.join("\n\n")
     }
 }

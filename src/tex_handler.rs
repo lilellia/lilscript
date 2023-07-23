@@ -68,6 +68,12 @@ impl Tex {
             .replace(r"\textellipsis{}", "... ")
             .replace(r"\textellipsis", "...");
 
+        // handle em dashes
+        const EM_DASH: &str = "\u{2014}";
+        let s = s
+            .replace(r"\textemdash{}", &format!("{EM_DASH} "))
+            .replace(r"\textemdash", EM_DASH);
+
         // handle quotation marks: ``abc'' -> "abc"
         let re = Regex::new(r"``(.*?)''").unwrap();
         let s = re.replace_all(&s, "\"$1\"");
@@ -187,7 +193,10 @@ impl TryFrom<&Tex> for TextSpan {
                 match command {
                     "direct" => Ok(TextSpan::inline(&arg)),
                     "ul" => Ok(TextSpan::emphasis(&arg)),
-                    _ => unreachable!(),
+                    _ => {
+                        let err = format!("unparsable TeX command: {:?}", command);
+                        Err(err)
+                    },
                 }
             }
         }

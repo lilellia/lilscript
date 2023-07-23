@@ -143,11 +143,7 @@ impl ToMarkdown for TextContainer {
                     SpanKind::Normal => format!("**{}**", span.to_markdown()),
                     SpanKind::Emphasis => {
                         let md = span.to_markdown();
-                        let context = (&self.spans)
-                            .into_iter()
-                            .map(|s| s.contents.clone())
-                            .collect::<Vec<String>>()
-                            .join(" ");
+                        let context = self.plain_text();
 
                         warn!(
                             "The emphasised span \"{}\" occurs within the scope of a \

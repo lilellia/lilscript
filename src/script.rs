@@ -257,12 +257,32 @@ impl TextContainer {
     /// add the given span to the end of the list and return the container back
     pub fn push(mut self, span: TextSpan) -> Self {
         self.spans.push(span);
-        return self
+        self
     }
 
     /// Return the number of spans in the container.
     pub fn len(&self) -> usize {
         self.spans.len()
+    }
+
+    /// Return the contents of the container without regard for formatting/context.
+    /// 
+    /// # Examples:
+    /// 
+    /// ```
+    /// # use lilscript::script::{TextContainer, ContainerKind, TextSpan};
+    /// let mut container = TextContainer::new(ContainerKind::Spoken);
+    /// container = container.push(TextSpan::normal("some text"))
+    ///     .push(TextSpan::inline("a cue"))
+    ///     .push(TextSpan::normal("more text"));
+    /// assert_eq!(container.plain_text(), "some text a cue more text");
+    /// ```
+    pub fn plain_text(&self) -> String {
+        (&self.spans)
+            .into_iter()
+            .map(|s| s.contents.clone())
+            .collect::<Vec<String>>()
+            .join(" ")
     }
 
     pub fn wordcount(&self) -> WordCount {
@@ -468,7 +488,7 @@ impl Display for Script {
                 } else {
                     String::from("_")
                 };
-                
+
                 writeln!(f, "{}::{:?}", prefix, span)?;
             }
         }

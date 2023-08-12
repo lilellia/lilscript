@@ -3,7 +3,7 @@
 
 use crate::script::{Character, ContainerKind, Script, SeriesEntry, TextContainer, TextSpan};
 use chrono::NaiveDate;
-use log::warn;
+use paris::warn;
 use regex::Regex;
 
 /// A thin wrapper around a String, used to represent a .tex formatted string.
@@ -66,7 +66,8 @@ impl Tex {
             .replace(r"\ldots{}", "... ")
             .replace(r"\ldots", "...")
             .replace(r"\textellipsis{}", "... ")
-            .replace(r"\textellipsis", "...");
+            .replace(r"\textellipsis", "...")
+            .replace(r"\beat", " [...]");
 
         // handle em dashes
         const EM_DASH: &str = "\u{2014}";
@@ -77,6 +78,9 @@ impl Tex {
         // handle quotation marks: ``abc'' -> "abc"
         let re = Regex::new(r"``(.*?)''").unwrap();
         let s = re.replace_all(&s, "\"$1\"");
+
+        // remove \restoregeometry
+        let s = s.replace(r"\restoregeometry", "");
 
         // handle the special single-characters
         let re = Regex::new(r"\\([%&$])").unwrap();
@@ -192,7 +196,7 @@ impl TryFrom<&Tex> for TextSpan {
 
                 match command {
                     "direct" => Ok(TextSpan::inline(&arg)),
-                    "ul" => Ok(TextSpan::emphasis(&arg)),
+                    "ul" | "emph" => Ok(TextSpan::emphasis(&arg)),
                     _ => {
                         let err = format!("unparsable TeX command: {:?}", command);
                         Err(err)
@@ -224,9 +228,7 @@ impl TryFrom<&Tex> for Script {
             .collect();
 
         let date = search_tex("scriptDate", &value.text).ok_or("Could not find date")?;
-        log::debug!("unprocessed date: \"{}\"", date);
         let date = NaiveDate::parse_from_str(&date, "%d %b %Y").ok();
-        log::debug!("  processed date: \"{:?}\"", date);
 
         let summary = search_tex("summary", &value.text).ok_or("Could not find summary")?;
 
@@ -256,9 +258,12 @@ impl TryFrom<&Tex> for Script {
                     "[Script::try_from<&Tex>] Could not parse line: \"{}\" — via: {}",
                     line, err
                 )
-            })?;
+            });
 
-            paragraphs.push(container);
+            match container {
+                Ok(c) => paragraphs.push(c),
+                Err(e) => warn!("{e}. Skipping container.", e=e)
+            }            
         }
 
         let script = Script {

@@ -1,7 +1,7 @@
 use crate::script::{ContainerKind, Script, SpanKind, TextContainer, TextSpan};
-use log::warn;
+use paris::{error, warn};
 use regex::Regex;
-use std::fmt::Write;
+use std::{collections::HashMap, fmt::Write};
 
 pub trait ToMarkdown {
     /// Convert the object to a Markdown format.
@@ -146,10 +146,10 @@ impl ToMarkdown for TextContainer {
                         let context = self.plain_text();
 
                         warn!(
-                            "The emphasised span \"{}\" occurs within the scope of a \
+                            "<yellow>The emphasised span <bold>{}</bold> occurs within the scope of a \
                             spoken line and has been rendered as spoken. However, it MAY occur \
                             within an inline direction, etc., but we do not know. \
-                            Context: \"{}\"",
+                            Context: \"{}\"</>",
                             md, context
                         );
                         format!("**{}**", md)
@@ -159,7 +159,7 @@ impl ToMarkdown for TextContainer {
             };
 
             write!(buf, " {} ", text).unwrap_or_else(|_| {
-                warn!("Failed writing to buffer: {}", span.contents);
+                error!("<red>Failed writing to buffer: {}</>", span.contents);
                 ()
             });
         }
@@ -198,30 +198,26 @@ impl ToMarkdown for Script {
         // Formatting guide
         lines.append(&mut vec![
             String::from("## Formatting guide"),
-
             TextContainer::new(ContainerKind::Spoken)
                 .push(TextSpan::normal("spoken text"))
                 .to_markdown(),
-            
             TextContainer::new(ContainerKind::Spoken)
                 .push(TextSpan::emphasis("emphasis"))
                 .to_markdown(),
-
             TextContainer::new(ContainerKind::Spoken)
                 .push(TextSpan::inline("tone cue, suggested"))
                 .to_markdown(),
-
             TextContainer::new(ContainerKind::StageDir)
                 .push(TextSpan::normal("stage direction and/or sfx"))
                 .to_markdown(),
-
             TextContainer::new(ContainerKind::ListenerDialogue)
-                .push(TextSpan::normal("example listener dialogue, not intended to be voiced"))
+                .push(TextSpan::normal(
+                    "example listener dialogue, not intended to be voiced",
+                ))
                 .to_markdown(),
-
             TextContainer::new(ContainerKind::PlainText)
                 .push(TextSpan::normal(DIVIDER))
-                .to_markdown()
+                .to_markdown(),
         ]);
 
         for container in &self.paragraphs {
@@ -230,4 +226,48 @@ impl ToMarkdown for Script {
 
         lines.join("\n\n")
     }
+}
+
+/// Convert the given input to small capital letters
+/// 
+/// # Examples
+/// ```
+/// # use lilscript::md_handler::small_caps;
+/// let s = "This is some text?";
+/// assert_eq!(small_caps(s), "ᴛʜɪs ɪs sᴏᴍᴇ ᴛᴇxᴛ?");
+/// ```
+pub fn small_caps(text: &str) -> String {
+    let small_cap_lookup: HashMap<char, char> = HashMap::from([
+        ('a', 'ᴀ'),
+        ('b', 'ʙ'),
+        ('c', 'ᴄ'),
+        ('d', 'ᴅ'),
+        ('e', 'ᴇ'),
+        ('f', 'ꜰ'),
+        ('g', 'ɢ'),
+        ('h', 'ʜ'),
+        ('i', 'ɪ'),
+        ('j', 'ᴊ'),
+        ('k', 'ᴋ'),
+        ('l', 'ʟ'),
+        ('m', 'ᴍ'),
+        ('n', 'ɴ'),
+        ('o', 'ᴏ'),
+        ('p', 'ᴘ'),
+        ('q', 'ǫ'),
+        ('r', 'ʀ'),
+        ('s', 's'),
+        ('t', 'ᴛ'),
+        ('u', 'ᴜ'),
+        ('v', 'ᴠ'),
+        ('w', 'ᴡ'),
+        ('x', 'x'),
+        ('y', 'ʏ'),
+        ('z', 'ᴢ'),
+    ]);
+
+    text.to_lowercase()
+        .chars()
+        .map(|c| small_cap_lookup.get(&c).unwrap_or(&c).to_owned())
+        .collect::<String>()
 }

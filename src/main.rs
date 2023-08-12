@@ -1,5 +1,5 @@
 use clap::Parser;
-use log::error;
+use paris::error;
 
 
 fn main() {

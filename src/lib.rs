@@ -1,7 +1,7 @@
 use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use env_logger;
-use log::debug;
+use paris::info;
 use std::{error::Error, fs, path::PathBuf};
 
 use crate::{md_handler::ToMarkdown, script::Script, tex_handler::Tex};
@@ -104,13 +104,12 @@ pub fn run(args: ArgumentParser) -> Result<(), Box<dyn Error>> {
     let in_extension = FileFormat::from_path(&args.infile)?;
     let out_extension = FileFormat::from_path(&args.outfile)?;
 
-    debug!("{:?} -> {:?}", in_extension, out_extension);
 
     if !(in_extension == FileFormat::Tex && out_extension == FileFormat::Markdown) {
         return Err("Only doing TeX ⟶ Markdown".into());
     }
 
-    debug!("Reading from: {:?}", args.infile);
+    info!("Reading from: {:?}", args.infile);
     let fcontents = fs::read_to_string(&args.infile)?;
 
     let script = match in_extension {
@@ -120,6 +119,8 @@ pub fn run(args: ArgumentParser) -> Result<(), Box<dyn Error>> {
         }
         _ => unreachable!(),
     }?;
+
+    info!("<on-cyan><black>Word count: {}</>", script.wordcount());
 
     // Write the desired file
     fs::write(args.outfile, &script.to_markdown())?;

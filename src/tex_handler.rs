@@ -75,8 +75,11 @@ impl Tex {
             .replace(r"\textemdash{}", &format!("{EM_DASH} "))
             .replace(r"\textemdash", EM_DASH);
 
-        // handle quotation marks: ``abc'' -> "abc"
+        // handle quotation marks: ``abc'' -> "abc" and \textquote{abc} -> "abc"
         let re = Regex::new(r"``(.*?)''").unwrap();
+        let s = re.replace_all(&s, "\"$1\"");
+
+        let re = Regex::new(r"\\textquote\{(.*?)\}").unwrap();
         let s = re.replace_all(&s, "\"$1\"");
 
         // remove \restoregeometry

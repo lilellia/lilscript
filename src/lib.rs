@@ -24,7 +24,7 @@ pub struct ArgumentParser {
     pub infile: PathBuf,
 
     #[arg(short, long, help = "the file to output the results to")]
-    pub outfile: PathBuf,
+    pub outfile: Option<PathBuf>,
 
     #[command(flatten)]
     pub verbose: Verbosity<InfoLevel>,
@@ -102,12 +102,6 @@ impl FileFormat {
 
 pub fn run(args: ArgumentParser) -> Result<(), Box<dyn Error>> {
     let in_extension = FileFormat::from_path(&args.infile)?;
-    let out_extension = FileFormat::from_path(&args.outfile)?;
-
-
-    if !(in_extension == FileFormat::Tex && out_extension == FileFormat::Markdown) {
-        return Err("Only doing TeX ⟶ Markdown".into());
-    }
 
     info!("Reading from: {:?}", args.infile);
     let fcontents = fs::read_to_string(&args.infile)?;
@@ -117,13 +111,22 @@ pub fn run(args: ArgumentParser) -> Result<(), Box<dyn Error>> {
             let tex = Tex::from(fcontents.as_str());
             Script::try_from(&tex)
         }
-        _ => unreachable!(),
+        _ => {
+            Err("Only .tex input files are currently supported".to_string())?
+        },
     }?;
 
     info!("<on-cyan><black>Word count: {}</>", script.wordcount());
 
     // Write the desired file
-    fs::write(args.outfile, &script.to_markdown())?;
+    if args.outfile.is_some() {
+        let outfile = args.outfile.unwrap();
+        let contents = match FileFormat::from_path(&outfile)? {
+            FileFormat::Tex => Err("Only .md output files are currently supported".to_string())?,
+            FileFormat::Markdown => script.to_markdown()
+        };
+        fs::write(outfile, &contents)?;
+    }
 
     Ok(())
 }
